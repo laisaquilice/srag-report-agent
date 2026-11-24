@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from srag.agent.fallback import deterministic_analysis
-from srag.agent.state import Analysis, MetricComment
+from srag.agent.state import Analysis, MetricComment, NewsCitation
 from srag.guardrails.input import ReportRequest, resolve_reference_date
 from srag.guardrails.output import check_analysis
 from srag.guardrails.pii import find_pii, mask_pii
@@ -28,7 +28,7 @@ def _analysis(summary: str, sources: list[str] | None = None) -> Analysis:
         metric_comments=[MetricComment(metric_key=k, comment="Comentário.") for k in keys],
         news_context="Contexto.",
         limitations="Limitações.",
-        sources=sources or [],
+        cited_news=[NewsCitation(url=u, contribution="Contexto.") for u in sources or []],
     )
 
 
@@ -80,4 +80,12 @@ def test_input_rejects_invalid_uf_and_out_of_range_date():
     request = ReportRequest(reference_date=date(2030, 1, 1))
     with pytest.raises(ValueError):
         resolve_reference_date(request, date(2024, 1, 1), REF)
-    assert resolve_reference_date(ReportRequest(), date(2024, 1, 1), REF) == REF
+    default = resolve_reference_date(ReportRequest(), date(2024, 1, 1), REF)
+    assert default == date(2025, 3, 17)  # 14 dias antes do fim da base (atraso de notificação)
+
+
+def test_output_rejects_no_news_claim_with_sources(metrics):
+    analysis = _analysis("Ok.", ["https://g1.globo.com/a"])
+    analysis.news_context = "Não há notícias disponíveis que expliquem o cenário."
+    issues = check_analysis(analysis, metrics, NEWS).issues
+    assert any("contradição" in i for i in issues)

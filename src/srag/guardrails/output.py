@@ -21,6 +21,7 @@ from srag.tools.news import NewsArticle
 
 _PERCENT = re.compile(r"([+-]?\d+(?:[.,]\d+)?)\s?%")
 _TOLERANCE = 0.15
+_NO_NEWS_CLAIM = re.compile(r"n[ãa]o h[áa] not[íi]cias|nenhuma not[íi]cia", re.IGNORECASE)
 
 
 class OutputCheck(BaseModel):
@@ -55,6 +56,9 @@ def check_analysis(
     for url in analysis.sources:
         if url not in known_urls:
             issues.append(f"Fonte não recuperada pela ferramenta de notícias: {url}")
+
+    if analysis.sources and _NO_NEWS_CLAIM.search(analysis.news_context):
+        issues.append("O texto diz que não há notícias, mas cita fontes: contradição.")
 
     pii = find_pii(text)
     if pii:

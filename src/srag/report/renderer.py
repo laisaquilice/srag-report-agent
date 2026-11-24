@@ -39,7 +39,7 @@ def _context(state: ReportState, run_id: str, model: str | None, decisions: list
         "analysis": analysis,
         "comments": {c.metric_key: mask_pii(c.comment) for c in analysis.metric_comments},
         "news": state["news"],
-        "used_sources": set(analysis.sources),
+        "contributions": {c.url: c.contribution for c in analysis.cited_news},
         "origin": state["analysis_origin"],
         "issues": state.get("guardrail_issues") or [],
         "decisions": decisions,

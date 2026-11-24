@@ -97,6 +97,7 @@ def _write_manifest(
         "analysis_origin": state["analysis_origin"],
         "analysis_attempts": state["attempts"],
         "guardrail_issues": state.get("guardrail_issues", []),
+        "llm_error": state.get("llm_error"),
         "metrics": state["metrics"].model_dump(mode="json"),
         "news_urls": [a.url for a in state["news"]],
         "decisions": audit.decisions,

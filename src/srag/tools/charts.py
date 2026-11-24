@@ -15,6 +15,7 @@ from pydantic import BaseModel  # noqa: E402
 from srag.data.repository import Period, SragRepository  # noqa: E402
 
 _BAR_COLOR = "#2a6f97"
+_PARTIAL_COLOR = "#9dbcd4"
 _MONTHS_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
 
 
@@ -48,14 +49,20 @@ def _plot_daily(series: list[tuple[date, int]], path: Path) -> None:
     plt.close(fig)
 
 
-def _plot_monthly(series: list[tuple[date, int]], path: Path) -> None:
+def _plot_monthly(series: list[tuple[date, int]], path: Path, reference_date: date) -> None:
     months, values = zip(*series, strict=True)
     labels = [f"{_MONTHS_PT[m.month - 1]}/{m.year % 100:02d}" for m in months]
+    colors = [_BAR_COLOR] * len(values)
+    partial = _add_month(months[-1]) - timedelta(days=1) > reference_date
+    if partial:  # mês corrente incompleto: destacado para não parecer uma queda real
+        labels[-1] += f"\n(até {reference_date:%d/%m})"
+        colors[-1] = _PARTIAL_COLOR
     fig, ax = plt.subplots(figsize=(9, 3.6), dpi=120)
-    ax.bar(labels, values, color=_BAR_COLOR)
+    ax.bar(labels, values, color=colors)
     for x, v in enumerate(values):
         ax.annotate(f"{v:,}".replace(",", "."), (x, v), ha="center", va="bottom", fontsize=8)
-    _style(ax, "Casos mensais de SRAG – últimos 12 meses")
+    title = "Casos mensais de SRAG – últimos 12 meses"
+    _style(ax, title + (" (último mês parcial)" if partial else ""))
     fig.tight_layout()
     fig.savefig(path)
     plt.close(fig)
@@ -74,7 +81,7 @@ def build_charts(
 
     daily_path, monthly_path = output_dir / "casos_diarios.png", output_dir / "casos_mensais.png"
     _plot_daily(daily, daily_path)
-    _plot_monthly(monthly, monthly_path)
+    _plot_monthly(monthly, monthly_path, reference_date)
 
     return Charts(
         daily=ChartSeries(

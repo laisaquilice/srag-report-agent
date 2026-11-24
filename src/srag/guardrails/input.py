@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 
 from pydantic import BaseModel, field_validator
 
-from srag.config import UFS
+from srag.config import NOTIFICATION_LAG_DAYS, UFS
 
 
 class ReportRequest(BaseModel):
@@ -27,11 +27,12 @@ class ReportRequest(BaseModel):
 def resolve_reference_date(
     request: ReportRequest, data_min: date | None, data_max: date | None
 ) -> date:
-    """Usa a data pedida (se dentro da base) ou a data mais recente disponível."""
+    """Usa a data pedida (se dentro da base) ou, por padrão, a data mais recente da base
+    menos `NOTIFICATION_LAG_DAYS`, para não comparar semanas ainda incompletas."""
     if data_min is None or data_max is None:
         raise ValueError("A base não tem casos para o recorte pedido.")
     if request.reference_date is None:
-        return data_max
+        return max(data_min, data_max - timedelta(days=NOTIFICATION_LAG_DAYS))
     if not data_min <= request.reference_date <= data_max:
         raise ValueError(
             f"Data de referência {request.reference_date} fora do intervalo da base "

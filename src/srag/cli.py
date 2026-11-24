@@ -26,7 +26,9 @@ def _parser() -> argparse.ArgumentParser:
 
     etl = sub.add_parser("etl", help="Carrega e limpa os CSVs do Open DATASUS.")
     etl.add_argument("files", nargs="+", type=Path, help="Arquivos CSV (INFLUDxx).")
-    etl.add_argument("--encoding", default="latin-1")
+    etl.add_argument(
+        "--encoding", default=None, help="Força a codificação (padrão: detecta por arquivo)."
+    )
 
     report = sub.add_parser("report", help="Gera o relatório (HTML + PDF).")
     report.add_argument("--uf", help="Sigla do estado (padrão: Brasil).")
@@ -63,7 +65,12 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Relatório PDF:  {state['report_paths']['pdf']}")
     print(f"Auditoria:      {audit.path}")
     if state["analysis_origin"] == "deterministic" and not args.offline:
-        print("Aviso: o texto do LLM foi reprovado pelos guardrails; usada análise determinística.")
+        reason = (
+            f"falha ao chamar o LLM ({state['llm_error']})"
+            if state.get("llm_error")
+            else "o texto do LLM foi reprovado pelos guardrails"
+        )
+        print(f"Aviso: {reason}; usada análise determinística.", file=sys.stderr)
     return 0
 
 

@@ -7,13 +7,16 @@ automaticamente um relatório (HTML + PDF) com métricas, gráficos e uma análi
 | Entregável | Onde |
 |---|---|
 | Diagrama conceitual da arquitetura (PDF) | [`docs/arquitetura.pdf`](docs/arquitetura.pdf) (PNG: [`docs/arquitetura.png`](docs/arquitetura.png)) |
-| Relatório de exemplo | [`reports/exemplo/relatorio.pdf`](reports/exemplo/relatorio.pdf) · [`relatorio.html`](reports/exemplo/relatorio.html) · [`manifest.json`](reports/exemplo/manifest.json) |
+| Relatório de exemplo (dados reais) | [`reports/exemplo/relatorio.pdf`](reports/exemplo/relatorio.pdf) · [`relatorio.html`](reports/exemplo/relatorio.html) |
+| Trilha de auditoria do exemplo | [`reports/exemplo/auditoria.jsonl`](reports/exemplo/auditoria.jsonl) · [`manifest.json`](reports/exemplo/manifest.json) |
 | Código | [`src/srag/`](src/srag) |
 | Testes | [`tests/`](tests) |
 
-> O relatório de exemplo foi gerado em modo `--offline` sobre **dados sintéticos**
-> (`scripts/generate_sample_data.py`), para que o repositório não distribua microdados.
-> Com a base real e as chaves de API, o mesmo comando gera o relatório com análise do LLM e notícias.
+> O relatório de exemplo foi gerado com `srag report` sobre a **base real do DATASUS**
+> (arquivos `INFLUD25` e `INFLUD26` de 23/11/2026, 589.437 casos), com análise do `gpt-4o-mini` e
+> notícias buscadas pela Tavily. Só agregados e o log de auditoria são versionados; os microdados
+> ficam fora do repositório. A trilha de auditoria mostra cada prompt, cada resposta, as buscas
+> escolhidas pelo LLM e o resultado dos guardrails dessa execução.
 
 ---
 
@@ -50,7 +53,8 @@ tem uma responsabilidade única e registra tudo na trilha de auditoria:
   análise. O fluxo fica previsível, auditável e testável.
 - **DuckDB** como banco analítico embarcado: lê o CSV bruto direto, faz o ETL em SQL, não exige
   servidor e oferece conexão `read_only`.
-- **Tavily** para notícias: API de busca feita para agentes, com filtro por domínio e por data.
+- **Tavily** para notícias: API de busca feita para agentes, com filtro por domínio e por data. Usa a
+  busca geral com janela de um mês, porque o modo `news` com filtro de domínios não retorna resultados.
 - **Injeção de dependências** (`AgentDeps`): LLM, ferramenta de notícias e repositório são
   injetados no grafo. Isso permite o modo `--offline` e testes sem chamadas externas.
 
@@ -73,6 +77,10 @@ ETL em [`src/srag/data/etl.py`](src/srag/data/etl.py):
 | `HOSPITAL`, `CLASSI_FIN`, `CS_SEXO` | idem | códigos inválidos → NULL |
 | `NU_IDADE_N` + `TP_IDADE` | `faixa_etaria` | **idade exata descartada**: só `0-4`, `5-19`, `20-59`, `60+` |
 
+Os arquivos antigos vêm em latin-1 com datas `dd/mm/aaaa`; os atuais (2025–2026), em UTF-8 com
+datas ISO (`2025-05-15T00:00:00.000Z`). O ETL detecta a codificação de cada arquivo e aceita os dois
+formatos de data, então dá para carregar anos diferentes juntos.
+
 Regras de qualidade:
 
 - Datas inválidas (ex.: `31/02`), anteriores a 2019, futuras, ou sintomas após a notificação são descartados.
@@ -83,7 +91,11 @@ Regras de qualidade:
 
 ## 3. Métricas
 
-Janela padrão: últimos 30 dias até a data de referência (a mais recente da base, ou `--ref-date`).
+Janela padrão: últimos 30 dias até a data de referência. Por padrão, a data de referência é a
+**última data da base menos 14 dias**: as notificações chegam com atraso, e as semanas mais recentes
+ficam incompletas. Na base real de nov/2026, a última semana tinha cerca de 15% dos casos de uma
+semana normal, o que produziria uma "queda" falsa de quase 80%. Use `--ref-date` para escolher
+outra data.
 
 | Métrica | Definição | Observação |
 |---|---|---|
@@ -95,7 +107,8 @@ Janela padrão: últimos 30 dias até a data de referência (a mais recente da b
 Taxas com denominador menor que 5 não são exibidas (`n/d`), por robustez estatística e privacidade.
 
 Gráficos: casos diários dos últimos 30 dias e casos mensais dos últimos 12 meses (dias e meses sem
-casos aparecem como zero).
+casos aparecem como zero). Se o mês da data de referência ainda não terminou, a barra dele aparece
+mais clara e marcada como parcial ("até dd/mm"), para não parecer uma queda real.
 
 ## 4. Governança e transparência
 
@@ -105,8 +118,10 @@ casos aparecem como zero).
   callback do LangChain); cada consulta de notícias com as URLs aceitas e as rejeitadas; o resultado
   dos guardrails.
 - **Registro de decisões**: toda decisão do agente fica registrada com o motivo (data de referência
-  escolhida, consulta rejeitada, trecho de notícia neutralizado, reescrita, fallback) e aparece numa
-  tabela no próprio relatório.
+  escolhida, cada busca escolhida pelo LLM, consulta rejeitada, trecho de notícia neutralizado,
+  aprovação ou reescrita do texto, fallback) e aparece numa tabela no próprio relatório.
+- **Citações justificadas**: cada notícia citada vem com uma frase do LLM explicando como ela ajuda a
+  entender as métricas. As notícias consultadas e não usadas também são listadas.
 - **Manifesto** (`reports/<id>/manifest.json`): parâmetros, modelo, métricas, URLs, decisões,
   problemas apontados pelos guardrails e **hash SHA-256 da base**, o que torna cada relatório reproduzível.
 - **Metodologia no relatório**: definição, observações e cobertura de cada métrica, origem do texto
@@ -121,8 +136,9 @@ casos aparecem como zero).
 | Banco | LLM não escreve SQL; consultas fixas e parametrizadas; whitelist de colunas; conexão `read_only` | `data/repository.py` |
 | Ferramenta de notícias | Consultas fora do tema saúde/SRAG são rejeitadas; limite de 3 buscas; allowlist de domínios (verificada também no resultado) | `tools/news.py` |
 | Prompt injection | Conteúdo de notícias delimitado como dado não confiável; padrões de instrução são removidos e sinalizados; prompt de sistema manda ignorar instruções externas | `tools/news.py`, `agent/prompts.py` |
-| Saída | Todo percentual citado precisa existir nas métricas ou nas notícias; fontes precisam ter sido recuperadas; sem PII; comentário obrigatório para as 4 métricas | `guardrails/output.py` |
-| Resiliência | Reescrita com feedback e depois fallback determinístico; falha da API de notícias não derruba o relatório; `temperature=0`, timeout e retries | `agent/graph.py`, `pipeline.py` |
+| Relevância | Notícia de domínio confiável só entra se tratar de doença respiratória (SRAG, influenza, COVID-19, VSR etc.) | `tools/news.py` |
+| Saída | Todo percentual citado precisa existir nas métricas ou nas notícias; fontes precisam ter sido recuperadas e justificadas; sem contradição ("não há notícias" citando fontes); sem PII; comentário obrigatório para as 4 métricas | `guardrails/output.py` |
+| Resiliência | Reescrita com feedback e depois fallback determinístico; se a API do LLM falhar (ex.: sem créditos), as buscas usam consultas padrão e o texto sai por regras, com o motivo registrado; falha da API de notícias não derruba o relatório; `temperature=0`, timeout e retries | `agent/graph.py`, `pipeline.py` |
 
 ## 6. Dados sensíveis (LGPD)
 
@@ -154,11 +170,12 @@ Copy-Item .env.example .env
 
 Preencha `OPENAI_API_KEY` e `TAVILY_API_KEY` no `.env`.
 
-**Dados reais**: baixe os CSVs `INFLUD24-*.csv` e/ou `INFLUD25-*.csv` no
-[Open DATASUS](https://opendatasus.saude.gov.br/dataset/srag-2021-a-2024), salve em `data/raw/` e rode:
+**Dados reais**: no [Portal de Dados Abertos do SUS](https://dadosabertos.saude.gov.br/dataset/srag-2019-a-2026),
+baixe os CSVs "Banco vivo" do ano atual e do anterior (ex.: `INFLUD25-*.csv` e `INFLUD26-*.csv`),
+salve em `data/raw/` e rode:
 
 ```powershell
-srag etl data/raw/INFLUD24-01-01-2025.csv data/raw/INFLUD25-01-01-2025.csv
+srag etl data/raw/INFLUD25-23-11-2026.csv data/raw/INFLUD26-23-11-2026.csv
 ```
 
 **Ou dados sintéticos**, para testar sem baixar nada:
@@ -215,7 +232,7 @@ src/srag/
   guardrails/             entrada, saída e PII
   governance/audit.py     trilha de auditoria JSONL + callback do LLM
   report/                 renderização HTML/PDF (Jinja2 + xhtml2pdf)
-tests/                    28 testes: ETL, métricas, guardrails, notícias, grafo ponta a ponta
+tests/                    32 testes: ETL, métricas, guardrails, notícias, grafo ponta a ponta
 scripts/                  gerador de dados sintéticos
 docs/                     diagrama de arquitetura (PDF/PNG) e script que o gera
 ```

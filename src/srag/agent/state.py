@@ -22,6 +22,13 @@ class MetricComment(BaseModel):
     )
 
 
+class NewsCitation(BaseModel):
+    url: str = Field(description="URL da notícia, exatamente como aparece em <noticias>.")
+    contribution: str = Field(
+        description="Uma frase: o que a notícia informa e como ajuda a explicar as métricas."
+    )
+
+
 class Analysis(BaseModel):
     """Análise escrita pelo LLM para o relatório."""
 
@@ -34,13 +41,20 @@ class Analysis(BaseModel):
         "Diga explicitamente se não houver notícias disponíveis."
     )
     limitations: str = Field(description="Limitações dos dados e da análise.")
-    sources: list[str] = Field(
-        default_factory=list, description="URLs das notícias usadas, exatamente como fornecidas."
+    cited_news: list[NewsCitation] = Field(
+        default_factory=list,
+        description="Somente as notícias relevantes usadas na análise, cada uma com a sua "
+        "contribuição. Deixe vazia se nenhuma for relevante.",
     )
+
+    @property
+    def sources(self) -> list[str]:
+        return [c.url for c in self.cited_news]
 
     def full_text(self) -> str:
         parts = [self.executive_summary, self.news_context, self.limitations]
         parts += [c.comment for c in self.metric_comments]
+        parts += [c.contribution for c in self.cited_news]
         return "\n".join(parts)
 
     def comment_for(self, key: str) -> str:
@@ -57,4 +71,5 @@ class ReportState(TypedDict, total=False):
     analysis_origin: Literal["llm", "deterministic"]
     attempts: int
     guardrail_issues: list[str]
+    llm_error: str
     report_paths: dict[str, str]

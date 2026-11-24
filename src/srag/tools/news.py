@@ -30,6 +30,24 @@ _HEALTH_TERMS = re.compile(
     re.IGNORECASE,
 )
 
+# Relevância: a notícia precisa tratar de doença respiratória (não basta o domínio ser confiável).
+_RESPIRATORY_TOPIC = re.compile(
+    r"srag|s[íi]ndrome respirat|doen[çc]as? respirat|v[íi]rus respirat|influenza|gripe|covid|"
+    r"vsr|sincicial|metapneumo|rinov[íi]rus|infogripe",
+    re.IGNORECASE,
+)
+
+
+def is_relevant(title: str, content: str) -> bool:
+    return bool(_RESPIRATORY_TOPIC.search(f"{title} {content}"))
+
+
+def _time_range(days: int) -> str:
+    for limit, label in ((1, "day"), (7, "week"), (31, "month")):
+        if days <= limit:
+            return label
+    return "year"
+
 
 class NewsArticle(BaseModel):
     title: str
@@ -84,19 +102,23 @@ class NewsSearchTool:
         self._max_results = max_results
 
     def search(self, query: str) -> tuple[list[NewsArticle], int]:
-        """Retorna (artigos aceitos, número de resultados descartados por domínio)."""
+        """Retorna (artigos aceitos, número de resultados descartados por domínio ou tema)."""
         query = validate_query(query)
         response = self._backend.search(
             query,
-            topic="news",
-            days=self._days,
+            # topic="news" combinado com include_domains não retorna resultados na Tavily;
+            # a busca geral com janela de tempo retorna as fontes da allowlist.
+            topic="general",
+            time_range=_time_range(self._days),
             max_results=self._max_results,
             include_domains=list(self._domains),
         )
         articles, rejected = [], 0
         for item in response.get("results", []):
             url = item.get("url", "")
-            if not is_trusted(url, self._domains):
+            if not is_trusted(url, self._domains) or not is_relevant(
+                item.get("title", ""), item.get("content", "")
+            ):
                 rejected += 1
                 continue
             content, flagged = sanitize_content(item.get("content", ""))

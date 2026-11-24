@@ -19,7 +19,6 @@ TRUSTED_NEWS_DOMAINS: tuple[str, ...] = (
     "estadao.com.br",
     "cnnbrasil.com.br",
     "agenciabrasil.ebc.com.br",
-    "bbc.com",
     "uol.com.br",
 )
 
@@ -54,6 +53,9 @@ UFS: frozenset[str] = frozenset(
         "TO",
     ]
 )
+
+NOTIFICATION_LAG_DAYS = 14
+"""Dias mais recentes ignorados por padrão: ainda estão incompletos por atraso de notificação."""
 
 MIN_CELL_SIZE = 5
 """Contagens abaixo deste valor não geram taxas (supressão de células pequenas)."""

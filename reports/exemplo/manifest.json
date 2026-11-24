@@ -1,91 +1,112 @@
 {
-  "run_id": "20261124T134813-82b717",
+  "run_id": "20261124T143735-b9699b",
   "request": {
     "uf": null,
     "reference_date": null
   },
-  "reference_date": "2025-06-30",
-  "model": null,
-  "analysis_origin": "deterministic",
+  "reference_date": "2026-11-08",
+  "model": "gpt-4o-mini",
+  "analysis_origin": "llm",
   "analysis_attempts": 1,
   "guardrail_issues": [],
+  "llm_error": null,
   "metrics": {
-    "reference_date": "2025-06-30",
+    "reference_date": "2026-11-08",
     "uf": null,
-    "total_cases_window": 7209,
+    "total_cases_window": 15399,
     "metrics": [
       {
         "key": "case_growth",
         "name": "Taxa de aumento de casos",
-        "value": 0.7,
-        "numerator": 1648,
-        "denominator": 1636,
-        "period_start": "2025-06-17",
-        "period_end": "2025-06-30",
-        "definition": "Variação percentual de casos (data de início dos sintomas) nos últimos 7 dias (1648) em relação aos 7 dias anteriores (1636).",
-        "caveat": "Casos recentes ainda estão sendo notificados (atraso de notificação), o que tende a subestimar a semana mais recente.",
+        "value": -6.5,
+        "numerator": 3233,
+        "denominator": 3458,
+        "period_start": "2026-10-26",
+        "period_end": "2026-11-08",
+        "definition": "Variação percentual de casos (data de início dos sintomas) nos últimos 7 dias (3233) em relação aos 7 dias anteriores (3458).",
+        "caveat": "Casos recentes ainda estão sendo notificados. Por padrão, as 2 semanas mais recentes da base são ignoradas; mesmo assim, a última semana pode estar subestimada.",
         "coverage": null
       },
       {
         "key": "mortality",
         "name": "Taxa de mortalidade",
-        "value": 18.7,
-        "numerator": 885,
-        "denominator": 4726,
-        "period_start": "2025-06-01",
-        "period_end": "2025-06-30",
+        "value": 4.5,
+        "numerator": 423,
+        "denominator": 9352,
+        "period_start": "2026-10-10",
+        "period_end": "2026-11-08",
         "definition": "Óbitos por SRAG / casos com desfecho conhecido (cura, óbito por SRAG ou por outras causas) nos últimos 30 dias.",
         "caveat": "Letalidade entre casos notificados (majoritariamente hospitalizados), não da população geral. Casos sem desfecho ainda não entram no cálculo.",
-        "coverage": 0.656
+        "coverage": 0.607
       },
       {
         "key": "icu_rate",
         "name": "Taxa de ocupação de UTI",
-        "value": 31.5,
-        "numerator": 1998,
-        "denominator": 6352,
-        "period_start": "2025-06-01",
-        "period_end": "2025-06-30",
+        "value": 29.4,
+        "numerator": 3934,
+        "denominator": 13373,
+        "period_start": "2026-10-10",
+        "period_end": "2026-11-08",
         "definition": "Casos internados em UTI / casos com a informação de UTI preenchida nos últimos 30 dias.",
         "caveat": "Proxy: a base não traz a capacidade de leitos. Mede a proporção de casos de SRAG que precisaram de UTI, não a ocupação dos leitos existentes (exigiria dados do CNES).",
-        "coverage": 0.881
+        "coverage": 0.868
       },
       {
         "key": "vaccination",
         "name": "Taxa de vacinação (COVID-19)",
-        "value": 67.2,
-        "numerator": 3922,
-        "denominator": 5836,
-        "period_start": "2025-06-01",
-        "period_end": "2025-06-30",
+        "value": 41.6,
+        "numerator": 6321,
+        "denominator": 15211,
+        "period_start": "2026-10-10",
+        "period_end": "2026-11-08",
         "definition": "Casos vacinados contra COVID-19 / casos com a informação de vacina preenchida nos últimos 30 dias.",
         "caveat": "Proxy: mede a vacinação entre os casos de SRAG notificados, não a cobertura vacinal da população (exigiria dados do SI-PNI).",
-        "coverage": 0.81
+        "coverage": 0.988
       }
     ]
   },
-  "news_urls": [],
+  "news_urls": [
+    "https://www.gov.br/saude/pt-br/assuntos/saude-de-a-a-z/c/covid-19/publicacoes-tecnicas/informes/informe-sindromes-gripais-se-44-de-2026-ampliado.pdf",
+    "https://www.gov.br/saude/pt-br/assuntos/saude-de-a-a-z/c/covid-19/atualizacao-de-casos/informe-sindromes-gripais-se-45-de-2026.pdf",
+    "https://www.saude.ms.gov.br/wp-content/uploads/2026/11/Plano-de-contingencia-Virus-Respiratorios-MATO-GROSSO-SO-SUL-SES-11-11-2026.pdf",
+    "https://www.gov.br/saude/pt-br/assuntos/saude-de-a-a-z/c/covid-19/atualizacao-de-casos/informe-sindromes-gripais-se-43-de-2026.pdf",
+    "https://agenciabrasil.ebc.com.br/saude/noticia/2026-11/reporter-da-agencia-brasil-vence-premio-sbim-de-jornalismo-em-saude",
+    "https://saude.sp.gov.br/resources/cve-centro-de-vigilancia-epidemiologica/areas-de-vigilancia/doencas-de-transmissao-respiratoria/coronavirus/2026/nota_informativa_covid_23nov.pdf",
+    "https://www.cnnbrasil.com.br/saude/casos-e-mortes-por-covid-19-sofrem-queda-de-688-em-2026",
+    "https://www.gov.br/saude/pt-br/assuntos/noticias/2026/novembro/covid-19-casos-e-obitos-seguem-em-queda-no-brasil",
+    "https://www.gov.br/saude/pt-br/assuntos/noticias/2026/novembro/ministerio-da-saude-enviara-doses-adicionais-de-vacinas-contra-a-covid-19-aos-estados"
+  ],
   "decisions": [
     {
       "step": "validate_input",
-      "decision": "data de referência 2025-06-30",
-      "reason": "data mais recente na base"
+      "decision": "data de referência 2026-11-08",
+      "reason": "última data da base (2026-11-22) menos 14 dias de atraso de notificação"
     },
     {
       "step": "research_news",
-      "decision": "sem busca de notícias",
-      "reason": "ferramenta de notícias desativada"
+      "decision": "buscar: influenza Brasil novembro 2026",
+      "reason": "consulta escolhida pelo LLM"
     },
     {
-      "step": "write_analysis",
-      "decision": "análise determinística",
-      "reason": "LLM desativado"
+      "step": "research_news",
+      "decision": "buscar: VSR Brasil novembro 2026",
+      "reason": "consulta escolhida pelo LLM"
+    },
+    {
+      "step": "research_news",
+      "decision": "buscar: COVID-19 Brasil novembro 2026",
+      "reason": "consulta escolhida pelo LLM"
+    },
+    {
+      "step": "check_output",
+      "decision": "texto aprovado (LLM)",
+      "reason": "passou em todas as verificações na tentativa 1"
     }
   ],
-  "data_sha256": "7eccee2410fc4c1a6515ccd84e58cd400c21ccad34211b6387267b4087980abf",
-  "audit_log": "logs\\run_20261124T134813-82b717.jsonl",
+  "data_sha256": "8bac61247ab2e644411d8a4e87173f8e97252b8cb47ef9033ef5dc06844c0d04",
+  "audit_log": "logs\\run_20261124T143735-b9699b.jsonl",
   "outputs": {
-    "html": "reports\\20261124T134813-82b717\\relatorio.html",
-    "pdf": "reports\\20261124T134813-82b717\\relatorio.pdf"
+    "html": "reports\\20261124T143735-b9699b\\relatorio.html",
+    "pdf": "reports\\20261124T143735-b9699b\\relatorio.pdf"
   }
 }

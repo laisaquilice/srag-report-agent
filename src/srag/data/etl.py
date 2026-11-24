@@ -40,7 +40,8 @@ _DATE_FORMATS = "['%d/%m/%Y', '%Y-%m-%d']"
 
 
 def _date(col: str) -> str:
-    return f"TRY_CAST(TRY_STRPTIME(TRIM({col}), {_DATE_FORMATS}) AS DATE)"
+    """Aceita `dd/mm/aaaa` (arquivos antigos) e ISO `aaaa-mm-ddT00:00:00.000Z` (arquivos novos)."""
+    return f"TRY_CAST(TRY_STRPTIME(LEFT(TRIM({col}), 10), {_DATE_FORMATS}) AS DATE)"
 
 
 def _code(col: str, valid: str) -> str:
@@ -53,17 +54,13 @@ _AGE_YEARS = (
     "WHEN TRY_CAST(TP_IDADE AS INTEGER) IN (1, 2) THEN 0 END"
 )
 
-_TRANSFORM_SQL = f"""
+_TRANSFORM_SQL_TEMPLATE = f"""
 CREATE OR REPLACE TABLE srag AS
 WITH raw AS (
     -- DISTINCT sobre a linha bruta completa: só remove registros duplicados de fato,
     -- nunca pacientes diferentes que coincidem nas colunas selecionadas.
     SELECT {", ".join(RAW_COLUMNS)}
-    FROM (
-        SELECT DISTINCT *
-        FROM read_csv($files, delim=';', header=true, all_varchar=true,
-                      encoding=$encoding, union_by_name=true, ignore_errors=true)
-    )
+    FROM (SELECT DISTINCT * FROM ({{source}}))
 ),
 typed AS (
     SELECT
@@ -110,8 +107,32 @@ class EtlSummary:
         return self.raw_rows - self.clean_rows
 
 
-def run_etl(csv_files: Sequence[Path], db_path: Path, encoding: str = "latin-1") -> EtlSummary:
-    """Lê os CSVs do DATASUS, aplica limpeza e grava a tabela `srag` em `db_path`."""
+def detect_encoding(path: Path, sample_bytes: int = 4_000_000) -> str:
+    """Os arquivos antigos do DATASUS são latin-1; os mais recentes, UTF-8."""
+    with Path(path).open("rb") as fh:
+        sample = fh.read(sample_bytes)
+    try:
+        sample.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        if exc.start < len(sample) - 3:  # erro real, não um caractere cortado no fim da amostra
+            return "latin-1"
+    return "utf-8"
+
+
+def _source_sql(n_files: int) -> str:
+    """Um read_csv por arquivo (cada um com sua codificação), unidos pelo nome das colunas."""
+    return " UNION ALL BY NAME ".join(
+        f"SELECT * FROM read_csv($f{i}, delim=';', header=true, all_varchar=true, "
+        f"encoding=$e{i}, ignore_errors=true)"
+        for i in range(n_files)
+    )
+
+
+def run_etl(csv_files: Sequence[Path], db_path: Path, encoding: str | None = None) -> EtlSummary:
+    """Lê os CSVs do DATASUS, aplica limpeza e grava a tabela `srag` em `db_path`.
+
+    `encoding=None` detecta a codificação de cada arquivo automaticamente.
+    """
     if not csv_files:
         raise ValueError("Nenhum arquivo CSV informado para o ETL.")
     missing = [str(f) for f in csv_files if not Path(f).exists()]
@@ -119,16 +140,16 @@ def run_etl(csv_files: Sequence[Path], db_path: Path, encoding: str = "latin-1")
         raise FileNotFoundError(f"Arquivos não encontrados: {missing}")
 
     db_path.parent.mkdir(parents=True, exist_ok=True)
-    files = [str(Path(f).resolve()) for f in csv_files]
-    params = {"files": files, "encoding": encoding}
+    params: dict[str, str] = {}
+    for i, f in enumerate(csv_files):
+        params[f"f{i}"] = str(Path(f).resolve())
+        params[f"e{i}"] = encoding or detect_encoding(Path(f))
+        logger.info("Lendo %s (%s)", Path(f).name, params[f"e{i}"])
+    source = _source_sql(len(csv_files))
 
     with duckdb.connect(str(db_path)) as con:
-        raw_rows = con.execute(
-            "SELECT COUNT(*) FROM read_csv($files, delim=';', header=true, all_varchar=true, "
-            "encoding=$encoding, union_by_name=true, ignore_errors=true)",
-            params,
-        ).fetchone()[0]
-        con.execute(_TRANSFORM_SQL, params)
+        raw_rows = con.execute(f"SELECT COUNT(*) FROM ({source})", params).fetchone()[0]
+        con.execute(_TRANSFORM_SQL_TEMPLATE.format(source=source), params)
         clean_rows, min_date, max_date = con.execute(
             "SELECT COUNT(*), MIN(dt_sintomas)::VARCHAR, MAX(dt_sintomas)::VARCHAR FROM srag"
         ).fetchone()

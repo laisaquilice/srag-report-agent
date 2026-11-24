@@ -46,5 +46,4 @@ def deterministic_analysis(report: MetricsReport, articles: list[NewsArticle]) -
             "Texto gerado por regras determinísticas, sem interpretação do LLM. "
             "Dados de notificação sujeitos a atraso e preenchimento incompleto."
         ),
-        sources=[a.url for a in articles[:5]],
     )

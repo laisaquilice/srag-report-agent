@@ -26,7 +26,7 @@ from srag.agent.prompts import (
     format_metrics,
 )
 from srag.agent.state import Analysis, ReportState
-from srag.config import Settings
+from srag.config import NOTIFICATION_LAG_DAYS, Settings
 from srag.data.repository import SragRepository
 from srag.governance.audit import AuditCallbackHandler, AuditLogger
 from srag.guardrails.input import resolve_reference_date
@@ -69,11 +69,15 @@ class _Nodes:
     def validate_input(self, state: ReportState) -> ReportState:
         request = state["request"]
         with self.d.audit.step("validate_input", request=request):
-            ref = resolve_reference_date(request, *self.d.repo.date_bounds(request.uf))
+            data_min, data_max = self.d.repo.date_bounds(request.uf)
+            ref = resolve_reference_date(request, data_min, data_max)
             self.d.audit.decision(
                 "validate_input",
                 f"data de referência {ref}",
-                "informada pelo usuário" if request.reference_date else "data mais recente na base",
+                "informada pelo usuário"
+                if request.reference_date
+                else f"última data da base ({data_max}) menos {NOTIFICATION_LAG_DAYS} dias "
+                "de atraso de notificação",
             )
         return {"reference_date": ref}
 
@@ -103,13 +107,23 @@ class _Nodes:
                 )
                 return {"news": []}
             collected: dict[str, NewsArticle] = {}
-            if self.d.llm is None:
+            update: ReportState = {}
+            if self.d.llm is not None:
+                try:
+                    self._agentic_search(state, collected)
+                except Exception as exc:  # LLM indisponível não pode derrubar o relatório
+                    update["llm_error"] = repr(exc)
+                    self.d.audit.decision(
+                        "research_news",
+                        "usar consultas padrão",
+                        "falha ao chamar o LLM para escolher as buscas",
+                        error=repr(exc),
+                    )
+            if self.d.llm is None or "llm_error" in update:
                 for query in DEFAULT_QUERIES:
                     self._run_search(query, collected)
-            else:
-                self._agentic_search(state, collected)
             self.d.audit.log("research_news", "output", urls=list(collected))
-        return {"news": list(collected.values())}
+        return {**update, "news": list(collected.values())}
 
     def _agentic_search(self, state: ReportState, collected: dict[str, NewsArticle]) -> None:
         """O LLM escolhe as consultas; cada uma passa pelos guardrails da ferramenta."""
@@ -132,6 +146,9 @@ class _Nodes:
                     result = "Limite de buscas atingido."
                 else:
                     searches += 1
+                    self.d.audit.decision(
+                        "research_news", f"buscar: {query}", "consulta escolhida pelo LLM"
+                    )
                     result = self._run_search(query, collected)
                 messages.append(ToolMessage(result, tool_call_id=call["id"]))
 
@@ -156,7 +173,7 @@ class _Nodes:
             tool="buscar_noticias_srag",
             query=query,
             accepted=[a.url for a in articles],
-            rejected_by_domain=rejected,
+            rejected_by_domain_or_topic=rejected,
         )
         return "\n".join(f"- {a.title} ({a.url})" for a in articles) or "Nenhum resultado."
 
@@ -177,9 +194,24 @@ class _Nodes:
             message = analyst_user_message(
                 state["metrics"], state["news"], state.get("guardrail_issues")
             )
-            analysis = structured.invoke(
-                [SystemMessage(ANALYST_SYSTEM), HumanMessage(message)], config=self.d.llm_config
-            )
+            try:
+                analysis = structured.invoke(
+                    [SystemMessage(ANALYST_SYSTEM), HumanMessage(message)],
+                    config=self.d.llm_config,
+                )
+            except Exception as exc:  # LLM indisponível: segue com texto determinístico
+                self.d.audit.decision(
+                    "write_analysis",
+                    "análise determinística",
+                    "falha ao chamar o LLM",
+                    error=repr(exc),
+                )
+                return {
+                    "analysis": deterministic_analysis(state["metrics"], state["news"]),
+                    "analysis_origin": "deterministic",
+                    "attempts": attempts,
+                    "llm_error": repr(exc),
+                }
         return {"analysis": analysis, "analysis_origin": "llm", "attempts": attempts}
 
     def check_output(self, state: ReportState) -> ReportState:
@@ -188,6 +220,13 @@ class _Nodes:
             self.d.audit.log(
                 "check_output", "guardrail", passed=result.passed, issues=result.issues
             )
+            if result.passed:
+                origin = "LLM" if state["analysis_origin"] == "llm" else "regras determinísticas"
+                self.d.audit.decision(
+                    "check_output",
+                    f"texto aprovado ({origin})",
+                    f"passou em todas as verificações na tentativa {state['attempts']}",
+                )
         return {"guardrail_issues": result.issues}
 
     def route_after_check(self, state: ReportState) -> str:

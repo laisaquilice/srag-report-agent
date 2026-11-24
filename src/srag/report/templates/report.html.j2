@@ -58,14 +58,20 @@
 
 <h2>Contexto das notícias</h2>
 <p>{{ analysis.news_context }}</p>
-{% if news %}
+{% set cited = news | selectattr('url', 'in', contributions) | list %}
+{% set unused = news | rejectattr('url', 'in', contributions) | list %}
+{% if cited %}
 <table class="grid">
-  <tr><th>Notícia</th><th>Data</th><th>Citada</th></tr>
-  {% for a in news %}
-  <tr><td><a href="{{ a.url }}">{{ a.title }}</a><br><span class="small">{{ a.url }}</span></td>
-      <td>{{ a.published or 's/d' }}</td><td>{{ 'sim' if a.url in used_sources else 'não' }}</td></tr>
+  <tr><th>Notícia citada</th><th>Como ajuda a explicar o cenário</th></tr>
+  {% for a in cited %}
+  <tr><td><a href="{{ a.url }}">{{ a.title }}</a>{% if a.published %}<br><span class="small">{{ a.published }}</span>{% endif %}</td>
+      <td>{{ contributions[a.url] }}</td></tr>
   {% endfor %}
 </table>
+{% endif %}
+{% if unused %}
+<p class="small"><b>Também consultadas, mas não usadas na análise:</b>
+  {% for a in unused %}<a href="{{ a.url }}">{{ a.title }}</a>{{ '; ' if not loop.last }}{% endfor %}.</p>
 {% endif %}
 
 <h2>Limitações</h2>

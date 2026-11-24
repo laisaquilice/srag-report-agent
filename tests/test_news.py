@@ -53,3 +53,19 @@ def test_content_is_truncated_and_pii_masked():
 def test_out_of_scope_queries_are_rejected(query):
     with pytest.raises(QueryRejectedError):
         _tool([]).search(query)
+
+
+def test_off_topic_articles_from_trusted_domains_are_dropped():
+    tool = _tool(
+        [
+            {
+                "title": "Eleições 2026",
+                "url": "https://g1.globo.com/politica/x",
+                "content": "votos",
+            },
+            {"title": "InfoGripe", "url": "https://fiocruz.br/n", "content": "SRAG por VSR cresce"},
+        ]
+    )
+    articles, rejected = tool.search("SRAG casos")
+    assert [a.url for a in articles] == ["https://fiocruz.br/n"]
+    assert rejected == 1

@@ -76,8 +76,8 @@ def _case_growth(repo: SragRepository, ref: date, uf: str | None) -> Metric:
             f"dias ({cur}) em relação aos {GROWTH_DAYS} dias anteriores ({prev})."
         ),
         caveat=(
-            "Casos recentes ainda estão sendo notificados (atraso de notificação), o que tende a "
-            "subestimar a semana mais recente."
+            "Casos recentes ainda estão sendo notificados. Por padrão, as 2 semanas mais recentes "
+            "da base são ignoradas; mesmo assim, a última semana pode estar subestimada."
         ),
     )
 

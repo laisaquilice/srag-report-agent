@@ -40,7 +40,7 @@ def settings(db_path, tmp_path):
 
 
 def test_offline_report_end_to_end(settings):
-    state, audit = generate_report(ReportRequest(), settings, offline=True)
+    state, audit = generate_report(ReportRequest(reference_date=REF), settings, offline=True)
 
     assert state["analysis_origin"] == "deterministic"
     assert all(Path(p).exists() for p in state["report_paths"].values())
@@ -133,3 +133,38 @@ def test_agentic_search_runs_tool_calls_through_guardrails(settings, repo, tmp_p
     assert [a.url for a in news] == ["https://www.gov.br/saude/n"]
     assert [q for q, _ in backend.calls] == ["SRAG Brasil"]  # consulta fora de escopo barrada
     assert any(d["decision"] == "consulta rejeitada" for d in audit.decisions)
+
+
+class FailingLLM(GenericFakeChatModel):
+    """Simula a API do LLM indisponível (ex.: sem créditos)."""
+
+    def bind_tools(self, tools, **kwargs):
+        return self
+
+    def with_structured_output(self, schema, **kwargs):
+        return self
+
+    def _generate(self, *args, **kwargs):
+        raise RuntimeError("429 - no credits")
+
+
+def test_llm_failure_degrades_to_deterministic_report(settings):
+    backend = FakeBackend([{"title": "SRAG", "url": "https://www.gov.br/saude/n", "content": "x"}])
+    audit = AuditLogger(settings.logs_dir)
+    with SragRepository(settings.db_path) as repo:
+        deps = AgentDeps(
+            settings=settings,
+            repo=repo,
+            audit=audit,
+            output_dir=settings.reports_dir / "falha",
+            llm=FailingLLM(messages=iter([])),
+            news_tool=NewsSearchTool(backend, settings.news_domains),
+        )
+        state = build_graph(deps).invoke({"request": ReportRequest(reference_date=REF)})
+
+    assert state["analysis_origin"] == "deterministic"
+    assert "no credits" in state["llm_error"]
+    assert len(backend.calls) == 2  # caiu para as consultas padrão
+    assert Path(state["report_paths"]["pdf"]).exists()
+    reasons = {d["reason"] for d in audit.decisions}
+    assert "falha ao chamar o LLM" in reasons

@@ -3,7 +3,7 @@ from datetime import date, timedelta
 import duckdb
 import pytest
 
-from srag.data.etl import run_etl
+from srag.data.etl import detect_encoding, run_etl
 from srag.data.repository import Period
 from tests.conftest import REF
 
@@ -49,3 +49,20 @@ def test_monthly_series_has_twelve_months(repo):
     series = repo.monthly_cases(Period(date(2024, 4, 1), REF))
     assert len(series) == 12
     assert series[-1] == (date(2025, 3, 1), 30)
+
+
+def test_etl_reads_new_utf8_iso_format_mixed_with_old_files(sample_csv, tmp_path):
+    """Arquivos recentes do DATASUS: UTF-8, campos entre aspas e datas ISO com hora."""
+    new_file = tmp_path / "INFLUD26.csv"
+    new_file.write_text(
+        '"NU_NOTIFIC";"DT_NOTIFIC";"DT_SIN_PRI";"SG_UF_NOT";"ID_MUNICIP";"EVOLUCAO";"UTI"\n'
+        '"1";"2025-04-02T00:00:00.000Z";"2025-04-01T00:00:00.000Z";"SP";"SÃO PAULO";"2";"1"\n'
+        '"2";"2025-04-03T00:00:00.000Z";"2025-04-02T00:00:00.000Z";"RJ";"NITERÓI";"1";"2"\n',
+        encoding="utf-8",
+    )
+    assert detect_encoding(new_file) == "utf-8"
+
+    summary = run_etl([sample_csv, new_file], tmp_path / "mixed.duckdb")
+
+    assert summary.clean_rows == 32
+    assert summary.max_date == "2025-04-02"
