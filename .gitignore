@@ -1,0 +1,21 @@
+# Ambiente
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Segredos
+.env
+
+# Dados (grandes e potencialmente sensíveis) e artefatos de execução
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+logs/*
+!logs/.gitkeep
+reports/*
+!reports/.gitkeep
+!reports/exemplo/

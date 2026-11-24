@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Relatório SRAG – {{ scope }} – {{ metrics.reference_date.strftime('%d/%m/%Y') }}</title>
+<style>
+  @page { size: a4 portrait; margin: 1.6cm; }
+  body { font-family: Helvetica, Arial, sans-serif; color: #1d2731; font-size: 10.5pt; line-height: 1.45;
+         {% if not for_pdf %}max-width: 920px; margin: 32px auto; padding: 0 20px;{% endif %} }
+  h1 { font-size: 20pt; margin: 0 0 4px 0; color: #0b3c5d; }
+  h2 { font-size: 13pt; color: #0b3c5d; border-bottom: 1px solid #d0d7de; padding-bottom: 3px; margin-top: 22px; }
+  .meta { color: #57606a; font-size: 9pt; }
+  .disclaimer { background: #fff8e5; border-left: 4px solid #d4a72c; padding: 6px 10px; font-size: 9pt; margin: 12px 0; }
+  table { width: 100%; border-collapse: collapse; }
+  .cards td { width: 25%; border: 1px solid #d0d7de; padding: 10px; vertical-align: top; }
+  .cards .value { font-size: 18pt; font-weight: bold; color: #0b3c5d; }
+  .cards .label { font-size: 9pt; color: #57606a; }
+  .small { font-size: 8.5pt; color: #57606a; }
+  .grid td, .grid th { border: 1px solid #d0d7de; padding: 5px 7px; font-size: 8.5pt; text-align: left; vertical-align: top; }
+  .grid th { background: #f3f5f7; }
+  img.chart { {% if for_pdf %}width: 17cm; height: 6.8cm;{% else %}width: 100%;{% endif %} }
+  .badge { font-size: 8pt; padding: 1px 6px; border-radius: 8px; background: #e7f0f7; color: #0b3c5d; }
+</style>
+</head>
+<body>
+
+<h1>Relatório de Síndrome Respiratória Aguda Grave (SRAG)</h1>
+<div class="meta">
+  Recorte: <b>{{ scope }}</b> · Data de referência: <b>{{ metrics.reference_date.strftime('%d/%m/%Y') }}</b> ·
+  Gerado em {{ generated_at }} · Execução <code>{{ run_id }}</code>
+</div>
+<div class="disclaimer">{{ disclaimer }}</div>
+
+<h2>Resumo executivo</h2>
+<p>{{ analysis.executive_summary }}</p>
+
+<h2>Métricas</h2>
+<table class="cards"><tr>
+{% for m in metrics.metrics %}
+  <td>
+    <div class="label">{{ m.name }}</div>
+    <div class="value">{{ m.display_value }}</div>
+    <div class="small">{{ m.numerator }} / {{ m.denominator }} ·
+      {{ m.period_start.strftime('%d/%m') }}–{{ m.period_end.strftime('%d/%m/%Y') }}</div>
+  </td>
+{% endfor %}
+</tr></table>
+
+{% for m in metrics.metrics %}
+<p><b>{{ m.name }}.</b> {{ comments.get(m.key, '') }}</p>
+{% endfor %}
+
+<h2>Casos diários – últimos 30 dias</h2>
+<img class="chart" src="{{ daily_img }}" alt="Casos diários de SRAG nos últimos 30 dias">
+
+<h2>Casos mensais – últimos 12 meses</h2>
+<img class="chart" src="{{ monthly_img }}" alt="Casos mensais de SRAG nos últimos 12 meses">
+
+<h2>Contexto das notícias</h2>
+<p>{{ analysis.news_context }}</p>
+{% if news %}
+<table class="grid">
+  <tr><th>Notícia</th><th>Data</th><th>Citada</th></tr>
+  {% for a in news %}
+  <tr><td><a href="{{ a.url }}">{{ a.title }}</a><br><span class="small">{{ a.url }}</span></td>
+      <td>{{ a.published or 's/d' }}</td><td>{{ 'sim' if a.url in used_sources else 'não' }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<h2>Limitações</h2>
+<p>{{ analysis.limitations }}</p>
+
+<h2>Metodologia e transparência</h2>
+<table class="grid">
+  <tr><th>Métrica</th><th>Definição</th><th>Observações</th><th>Cobertura</th></tr>
+  {% for m in metrics.metrics %}
+  <tr><td>{{ m.name }}</td><td>{{ m.definition }}</td><td>{{ m.caveat }}</td>
+      <td>{{ '%.1f%%' % (100 * m.coverage) if m.coverage is not none else '—' }}</td></tr>
+  {% endfor %}
+</table>
+<p class="small">
+  Fonte dos dados: Open DATASUS – SRAG (notificações SIVEP-Gripe). Casos contados pela data de início dos sintomas.
+  "Cobertura" é a fração dos casos do período com o campo usado no cálculo preenchido.
+  Taxas com denominador menor que 5 não são exibidas.
+</p>
+<p class="small">
+  Texto analítico: <span class="badge">{{ 'LLM – ' ~ model if origin == 'llm' else 'determinístico' }}</span>.
+  Todos os números foram calculados por consultas SQL determinísticas; o modelo de linguagem apenas os interpreta
+  e o texto passou por verificação automática (números, fontes e dados pessoais).
+</p>
+
+<h2>Registro de decisões do agente</h2>
+<table class="grid">
+  <tr><th>Etapa</th><th>Decisão</th><th>Motivo</th></tr>
+  {% for d in decisions %}
+  <tr><td>{{ d.step }}</td><td>{{ d.decision }}</td><td>{{ d.reason }}</td></tr>
+  {% endfor %}
+</table>
+<p class="small">Trilha completa de auditoria: <code>logs/run_{{ run_id }}.jsonl</code>.</p>
+
+</body>
+</html>

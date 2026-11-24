@@ -1,0 +1,91 @@
+{
+  "run_id": "20261124T134813-82b717",
+  "request": {
+    "uf": null,
+    "reference_date": null
+  },
+  "reference_date": "2025-06-30",
+  "model": null,
+  "analysis_origin": "deterministic",
+  "analysis_attempts": 1,
+  "guardrail_issues": [],
+  "metrics": {
+    "reference_date": "2025-06-30",
+    "uf": null,
+    "total_cases_window": 7209,
+    "metrics": [
+      {
+        "key": "case_growth",
+        "name": "Taxa de aumento de casos",
+        "value": 0.7,
+        "numerator": 1648,
+        "denominator": 1636,
+        "period_start": "2025-06-17",
+        "period_end": "2025-06-30",
+        "definition": "Variação percentual de casos (data de início dos sintomas) nos últimos 7 dias (1648) em relação aos 7 dias anteriores (1636).",
+        "caveat": "Casos recentes ainda estão sendo notificados (atraso de notificação), o que tende a subestimar a semana mais recente.",
+        "coverage": null
+      },
+      {
+        "key": "mortality",
+        "name": "Taxa de mortalidade",
+        "value": 18.7,
+        "numerator": 885,
+        "denominator": 4726,
+        "period_start": "2025-06-01",
+        "period_end": "2025-06-30",
+        "definition": "Óbitos por SRAG / casos com desfecho conhecido (cura, óbito por SRAG ou por outras causas) nos últimos 30 dias.",
+        "caveat": "Letalidade entre casos notificados (majoritariamente hospitalizados), não da população geral. Casos sem desfecho ainda não entram no cálculo.",
+        "coverage": 0.656
+      },
+      {
+        "key": "icu_rate",
+        "name": "Taxa de ocupação de UTI",
+        "value": 31.5,
+        "numerator": 1998,
+        "denominator": 6352,
+        "period_start": "2025-06-01",
+        "period_end": "2025-06-30",
+        "definition": "Casos internados em UTI / casos com a informação de UTI preenchida nos últimos 30 dias.",
+        "caveat": "Proxy: a base não traz a capacidade de leitos. Mede a proporção de casos de SRAG que precisaram de UTI, não a ocupação dos leitos existentes (exigiria dados do CNES).",
+        "coverage": 0.881
+      },
+      {
+        "key": "vaccination",
+        "name": "Taxa de vacinação (COVID-19)",
+        "value": 67.2,
+        "numerator": 3922,
+        "denominator": 5836,
+        "period_start": "2025-06-01",
+        "period_end": "2025-06-30",
+        "definition": "Casos vacinados contra COVID-19 / casos com a informação de vacina preenchida nos últimos 30 dias.",
+        "caveat": "Proxy: mede a vacinação entre os casos de SRAG notificados, não a cobertura vacinal da população (exigiria dados do SI-PNI).",
+        "coverage": 0.81
+      }
+    ]
+  },
+  "news_urls": [],
+  "decisions": [
+    {
+      "step": "validate_input",
+      "decision": "data de referência 2025-06-30",
+      "reason": "data mais recente na base"
+    },
+    {
+      "step": "research_news",
+      "decision": "sem busca de notícias",
+      "reason": "ferramenta de notícias desativada"
+    },
+    {
+      "step": "write_analysis",
+      "decision": "análise determinística",
+      "reason": "LLM desativado"
+    }
+  ],
+  "data_sha256": "7eccee2410fc4c1a6515ccd84e58cd400c21ccad34211b6387267b4087980abf",
+  "audit_log": "logs\\run_20261124T134813-82b717.jsonl",
+  "outputs": {
+    "html": "reports\\20261124T134813-82b717\\relatorio.html",
+    "pdf": "reports\\20261124T134813-82b717\\relatorio.pdf"
+  }
+}
